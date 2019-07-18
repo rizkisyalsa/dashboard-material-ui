@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import clsx from "clsx";
 import { makeStyles } from "@material-ui/core/styles";
 import CssBaseline from "@material-ui/core/CssBaseline";
@@ -18,9 +18,11 @@ import MenuIcon from "@material-ui/icons/Menu";
 import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
 import NotificationsIcon from "@material-ui/icons/Notifications";
 import { mainListItems, secondaryListItems } from "./listItems";
-import Chart from "./Chart";
-import Deposits from "./Deposits";
-import Orders from "./Orders";
+import update from "immutability-helper";
+import { NativeTypes } from "react-dnd-html5-backend";
+import Drag from "./Drag";
+import Drop from "./Drop";
+import ItemTypes from "./ItemTypes"
 
 function MadeWithLove() {
   return (
@@ -111,20 +113,64 @@ const useStyles = makeStyles(theme => ({
     flexDirection: "column"
   },
   fixedHeight: {
-    height: '80vh'
+    height: "80vh"
   }
 }));
 
 export default function Dashboard() {
   const classes = useStyles();
+
   const [open, setOpen] = React.useState(true);
+
   const handleDrawerOpen = () => {
     setOpen(true);
   };
+
   const handleDrawerClose = () => {
     setOpen(false);
   };
+
   const fixedHeightPaper = clsx(classes.paper, classes.fixedHeight);
+
+  const [dustbins, setDustbins] = useState([
+    { accepts: [ItemTypes.GLASS], lastDroppedItem: null },
+    { accepts: [ItemTypes.FOOD], lastDroppedItem: null },
+    {
+      accepts: [ItemTypes.PAPER, ItemTypes.GLASS, NativeTypes.URL],
+      lastDroppedItem: null
+    },
+    { accepts: [ItemTypes.PAPER, NativeTypes.FILE], lastDroppedItem: null }
+  ]);
+
+  const [droppedBoxNames, setDroppedBoxNames] = useState([]);
+  function isDropped(boxName) {
+    return droppedBoxNames.indexOf(boxName) > -1;
+  }
+
+  const [boxes] = useState([
+    { name: "Bottle", type: ItemTypes.GLASS },
+    { name: "Banana", type: ItemTypes.FOOD },
+    { name: "Magazine", type: ItemTypes.PAPER }
+  ]);
+
+  const handleDrop = useCallback(
+    (index, item) => {
+      const { name } = item;
+      setDroppedBoxNames(
+        update(droppedBoxNames, name ? { $push: [name] } : { $push: [] })
+      );
+      setDustbins(
+        update(dustbins, {
+          [index]: {
+            lastDroppedItem: {
+              $set: item
+            }
+          }
+        })
+      );
+    },
+    [droppedBoxNames, dustbins]
+  )
 
   return (
     <div className={classes.root}>
@@ -183,24 +229,32 @@ export default function Dashboard() {
         <div className={classes.appBarSpacer} />
         <Container maxWidth="lg" className={classes.container}>
           <Grid container spacing={3}>
-            {/* Chart */}
-            <Grid item xs={12} md={12} lg={12}>
+            {/* ------------- Drag ------------- */}
+            <Grid item xs={2} md={2} lg={2}>
               <Paper className={fixedHeightPaper}>
-                <Chart />
+                {boxes.map(({ name, type }, index) => (
+                  <Drag
+                    name={name}
+                    type={type}
+                    isDropped={isDropped(name)}
+                    key={index}
+                  />
+                ))}
               </Paper>
             </Grid>
-            {/* Recent Deposits */}
-            {/* <Grid item xs={12} md={4} lg={3}>
+            {/* ------------- Drop ------------- */}
+            <Grid item xs={10} md={10} lg={10}>
               <Paper className={fixedHeightPaper}>
-                <Deposits />
+                {dustbins.map(({ accepts, lastDroppedItem }, index) => (
+                  <Drop
+                    accept={accepts}
+                    lastDroppedItem={lastDroppedItem}
+                    onDrop={item => handleDrop(index, item)}
+                    key={index}
+                  />
+                ))}
               </Paper>
-            </Grid> */}
-            {/* Recent Orders */}
-            {/* <Grid item xs={12}>
-              <Paper className={classes.paper}>
-                <Orders />
-              </Paper>
-            </Grid> */}
+            </Grid>
           </Grid>
         </Container>
         <MadeWithLove />
